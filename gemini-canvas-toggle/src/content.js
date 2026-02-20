@@ -138,23 +138,33 @@
             preview.style.display = 'block';
             copyBtn.style.display = 'block';
             
+            // Save current inline styles before hiding
+            editor.dataset.origVisibility = editor.style.visibility;
+            editor.dataset.origOpacity = editor.style.opacity;
+            editor.dataset.origPointerEvents = editor.style.pointerEvents;
+
             // Hide the original editor to ensure it doesn't peek through or interfere
             editor.style.visibility = 'hidden';
             editor.style.opacity = '0';
             editor.style.pointerEvents = 'none';
 
-            btn.innerText = 'Show Raw'; // Updated label
+            btn.innerText = 'Show Raw';
         } else {
             // Switch to RAW
             preview.style.display = 'none';
             copyBtn.style.display = 'none';
             
-            // Restore the original editor
-            editor.style.visibility = 'visible';
-            editor.style.opacity = '1';
-            editor.style.pointerEvents = 'auto';
+            // Restore the original editor styles from dataset
+            editor.style.visibility = editor.dataset.origVisibility || '';
+            editor.style.opacity = editor.dataset.origOpacity || '';
+            editor.style.pointerEvents = editor.dataset.origPointerEvents || '';
+
+            // Clear saved values to avoid leaks
+            delete editor.dataset.origVisibility;
+            delete editor.dataset.origOpacity;
+            delete editor.dataset.origPointerEvents;
             
-            btn.innerText = 'Show Preview'; // Updated label
+            btn.innerText = 'Show Preview';
         }
     }
 
