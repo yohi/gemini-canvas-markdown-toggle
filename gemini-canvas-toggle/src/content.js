@@ -181,7 +181,9 @@
             // Turndown might over-process it.
             const innerText = editor.innerText;
             // Nitpick fix: Be stricter about markers, requiring following whitespace for block markers
-            const looksLikeMarkdown = /^\s*(?:#+\s|>\s|[*+-]\s|\[.*\]\(.*\)|\*\*|__)/m.test(innerText);
+            // and also check for inline markers (**...**, __...__) anywhere in the text.
+            const looksLikeMarkdown = /^\s*(?:#+\s|>\s|[*+-]\s|\[.*\]\(.*\))/m.test(innerText) || 
+                                     /(\*\*|__).+?\1/.test(innerText);
             
             if (looksLikeMarkdown) {
                 return innerText;
