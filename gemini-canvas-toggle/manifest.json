@@ -12,7 +12,13 @@
     {
       "matches": ["https://gemini.google.com/*"],
       "css": ["libs/github-markdown.css", "src/content.css"],
-      "js": ["libs/marked.min.js", "libs/purify.min.js", "src/content.js"]
+      "js": [
+        "libs/marked.min.js",
+        "libs/purify.min.js",
+        "libs/turndown.js",
+        "libs/turndown-plugin-gfm.js",
+        "src/content.js"
+      ]
     }
   ]
 }
