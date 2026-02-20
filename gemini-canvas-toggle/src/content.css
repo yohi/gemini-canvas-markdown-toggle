@@ -22,6 +22,30 @@
   border-color: #1b1f2426;
 }
 
+/* Copy Button */
+.gemini-canvas-copy-btn {
+  position: absolute;
+  top: 10px;
+  right: 100px; /* Positioned to the left of the toggle button */
+  z-index: 9999;
+  padding: 6px 12px;
+  background-color: #ffffff;
+  border: 1px solid #d0d7de;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif,"Apple Color Emoji","Segoe UI Emoji";
+  box-shadow: 0 1px 0 rgba(27,31,36,0.04);
+  color: #24292f;
+  transition: 0.2s cubic-bezier(0.3, 0, 0.5, 1);
+  transition-property: color, background-color, border-color;
+}
+
+.gemini-canvas-copy-btn:hover {
+  background-color: #f3f4f6;
+  border-color: #1b1f2426;
+}
+
 /* Preview Container */
 .gemini-canvas-preview {
   position: absolute;
@@ -46,14 +70,18 @@ body.dark .gemini-canvas-preview {
 }
 
 body[data-theme="dark"] .gemini-canvas-toggle-btn,
-body.dark .gemini-canvas-toggle-btn {
+body[data-theme="dark"] .gemini-canvas-copy-btn,
+body.dark .gemini-canvas-toggle-btn,
+body.dark .gemini-canvas-copy-btn {
     background-color: #21262d;
     color: #c9d1d9;
     border-color: #30363d;
 }
 
 body[data-theme="dark"] .gemini-canvas-toggle-btn:hover,
-body.dark .gemini-canvas-toggle-btn:hover {
+body[data-theme="dark"] .gemini-canvas-copy-btn:hover,
+body.dark .gemini-canvas-toggle-btn:hover,
+body.dark .gemini-canvas-copy-btn:hover {
     background-color: #30363d;
     border-color: #8b949e;
 }

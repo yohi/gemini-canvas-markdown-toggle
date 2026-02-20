@@ -69,6 +69,14 @@
         // Styles are in content.css
         container.appendChild(preview);
 
+        // Create Copy Button (Hidden by default)
+        const copyBtn = document.createElement('button');
+        copyBtn.className = 'gemini-canvas-copy-btn';
+        copyBtn.innerText = 'Copy MD';
+        copyBtn.type = 'button';
+        copyBtn.style.display = 'none';
+        container.appendChild(copyBtn);
+
         // Create Toggle Button
         const btn = document.createElement('button');
         btn.className = 'gemini-canvas-toggle-btn';
@@ -76,15 +84,31 @@
         btn.type = 'button'; // Prevent form submission if inside form
         container.appendChild(btn);
 
-        // Event Listener
+        // Event Listener - Toggle
         btn.addEventListener('click', (e) => {
             e.stopPropagation();
             e.preventDefault();
-            toggleMode(container, editor, preview, btn);
+            toggleMode(container, editor, preview, btn, copyBtn);
+        });
+
+        // Event Listener - Copy
+        copyBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            e.preventDefault();
+            const text = getEditorText(editor);
+            navigator.clipboard.writeText(text).then(() => {
+                const originalText = copyBtn.innerText;
+                copyBtn.innerText = 'Copied!';
+                setTimeout(() => {
+                    copyBtn.innerText = originalText;
+                }, 2000);
+            }).catch(err => {
+                console.error('Gemini Canvas Toggle: Failed to copy text: ', err);
+            });
         });
     }
 
-    function toggleMode(container, editor, preview, btn) {
+    function toggleMode(container, editor, preview, btn, copyBtn) {
         const isPreviewHidden = (getComputedStyle(preview).display === 'none');
 
         if (isPreviewHidden) {
@@ -93,6 +117,7 @@
             const html = renderMarkdown(text);
             preview.innerHTML = html;
             preview.style.display = 'block';
+            copyBtn.style.display = 'block';
 
             // Optional: Hide editor or ensure preview covers it.
             // Preview is absolute positioned with z-index.
@@ -102,6 +127,7 @@
         } else {
             // Switch to RAW
             preview.style.display = 'none';
+            copyBtn.style.display = 'none';
             btn.innerText = 'Preview';
         }
     }
