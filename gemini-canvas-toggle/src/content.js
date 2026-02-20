@@ -12,7 +12,22 @@
         processed: 'gemini-canvas-processed'
     };
 
+    let turndownService;
+
     function init() {
+        // Initialize TurndownService
+        if (typeof TurndownService !== 'undefined') {
+            turndownService = new TurndownService({
+                headingStyle: 'atx',
+                codeBlockStyle: 'fenced'
+            });
+            if (typeof turndownPluginGfm !== 'undefined' && turndownPluginGfm.gfm) {
+                turndownService.use(turndownPluginGfm.gfm);
+            }
+        } else {
+            console.warn("Gemini Canvas Toggle: TurndownService not found. Markdown conversion might be limited.");
+        }
+
         const observer = new MutationObserver((mutations) => {
             detectCanvas();
         });
@@ -137,6 +152,10 @@
             return editor.value;
         } else {
             // For contenteditable
+            if (turndownService) {
+                // Use Turndown to convert HTML to Markdown
+                return turndownService.turndown(editor.innerHTML);
+            }
             return editor.innerText;
         }
     }
