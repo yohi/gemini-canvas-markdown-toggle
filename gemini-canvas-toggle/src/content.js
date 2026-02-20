@@ -12,40 +12,9 @@
         processed: 'gemini-canvas-processed'
     };
 
-    const DETECT_CANVAS_DEBOUNCE_MS = 150;
-    let detectCanvasDebounceTimer = null;
-    let detectCanvasRafId = null;
-
-    function scheduleDetectCanvas() {
-        if (detectCanvasDebounceTimer !== null) {
-            clearTimeout(detectCanvasDebounceTimer);
-        }
-
-        detectCanvasDebounceTimer = setTimeout(() => {
-            detectCanvasDebounceTimer = null;
-
-            if (detectCanvasRafId !== null) {
-                cancelAnimationFrame(detectCanvasRafId);
-            }
-
-            detectCanvasRafId = requestAnimationFrame(() => {
-                detectCanvasRafId = null;
-                detectCanvas();
-            });
-        }, DETECT_CANVAS_DEBOUNCE_MS);
-    }
-
     function init() {
         const observer = new MutationObserver((mutations) => {
-            const hasRelevantMutation = mutations.some((mutation) => {
-                return mutation.addedNodes.length > 0 || mutation.removedNodes.length > 0;
-            });
-
-            if (!hasRelevantMutation) {
-                return;
-            }
-
-            scheduleDetectCanvas();
+            detectCanvas();
         });
 
         observer.observe(document.body, {
@@ -78,10 +47,6 @@
             // We want a container that wraps the editor directly or close to it.
             // Using parentElement is a safe bet for a start.
             let container = editor.parentElement;
-
-            if (!container) {
-                return;
-            }
 
             // Try to find a better container if the immediate parent is too small or inline
             // But usually immediate parent is fine.

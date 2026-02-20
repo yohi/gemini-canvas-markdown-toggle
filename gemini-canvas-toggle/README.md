@@ -8,7 +8,7 @@ A Chrome Extension that allows you to toggle between Raw Markdown and Preview in
 *   **Secure**: Uses `DOMPurify` to sanitize HTML.
 *   **Offline Libraries**: All dependencies (`marked`, `DOMPurify`, `github-markdown-css`) are bundled.
 *   **Dark Mode**: Supports Gemini's dark theme.
-*   **Copy to Clipboard**: Easily copy the raw Markdown text while in preview mode.
+*   **Copy to Clipboard**: Easily copy the raw markdown text while in preview mode.
 
 ## Installation (Developer Mode)
 
@@ -27,7 +27,7 @@ Since this extension is not yet published on the Chrome Web Store, you can insta
 3.  Look for the **Preview** button in the top-right corner of the editor area.
 4.  Click **Preview** to see the rendered Markdown.
 5.  Click **Raw** to return to editing mode.
-6.  In Preview mode, click **Copy MD** to copy the Markdown text to your clipboard.
+6.  In Preview mode, click **Copy MD** to copy the markdown text to your clipboard.
 
 ## Tech Stack
 
