@@ -170,7 +170,8 @@
             // HEURISTIC: If the text already looks like markdown (e.g. starts with # or has **),
             // Turndown might over-process it.
             const innerText = editor.innerText;
-            const looksLikeMarkdown = /^[#*>-]|\[.*\]\(.*\)/m.test(innerText);
+            // Nitpick fix: Allow leading whitespace and add more markers (bold)
+            const looksLikeMarkdown = /^\s*(?:[#*>-]|\[.*\]\(.*\)|\*\*|__)/m.test(innerText);
             
             if (looksLikeMarkdown) {
                 return innerText;
