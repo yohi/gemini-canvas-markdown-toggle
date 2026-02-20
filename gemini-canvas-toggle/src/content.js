@@ -46,9 +46,8 @@
         const editors = document.querySelectorAll(SELECTORS.editor);
 
         editors.forEach(editor => {
-            // Check if this specific editor is already processed (or its container)
-            // We search up to find if we already attached our UI to a parent
-            if (editor.closest(`.${SELECTORS.processed}`)) {
+            // Check if this specific editor is already processed
+            if (editor.hasAttribute('data-gemini-canvas-processed')) {
                 return;
             }
 
@@ -59,16 +58,23 @@
             }
 
             // Identify a suitable container to inject our UI
-            // We want a container that wraps the editor directly or close to it.
-            // Using parentElement is a safe bet for a start.
             let container = editor.parentElement;
-
-            // Try to find a better container if the immediate parent is too small or inline
-            // But usually immediate parent is fine.
+            
+            // CLEANUP: If there's already our UI in this container, remove it first.
+            // This handles cases where Gemini replaces the editor element.
+            const existingUI = container.querySelectorAll('.gemini-canvas-preview, .gemini-canvas-copy-btn, .gemini-canvas-toggle-btn');
+            if (existingUI.length > 0) {
+                existingUI.forEach(el => el.remove());
+            }
 
             // Mark as processed
+            editor.setAttribute('data-gemini-canvas-processed', 'true');
+
+            // Ensure container has correct positioning
             container.classList.add(SELECTORS.processed);
-            container.classList.add('gemini-canvas-container-relative');
+            if (getComputedStyle(container).position === 'static') {
+                container.classList.add('gemini-canvas-container-relative');
+            }
 
             injectUI(container, editor);
         });
@@ -80,8 +86,6 @@
         // Create Preview Container
         const preview = document.createElement('div');
         preview.className = 'gemini-canvas-preview markdown-body';
-        // Ensure preview has a background so it covers the editor
-        // Styles are in content.css
         container.appendChild(preview);
 
         // Create Copy Button (Hidden by default)
@@ -95,8 +99,8 @@
         // Create Toggle Button
         const btn = document.createElement('button');
         btn.className = 'gemini-canvas-toggle-btn';
-        btn.innerText = 'Preview';
-        btn.type = 'button'; // Prevent form submission if inside form
+        btn.innerText = 'Show Preview'; // Updated label
+        btn.type = 'button';
         container.appendChild(btn);
 
         // Event Listener - Toggle
@@ -133,17 +137,34 @@
             preview.innerHTML = html;
             preview.style.display = 'block';
             copyBtn.style.display = 'block';
+            
+            // Save current inline styles before hiding with scoped names
+            editor.dataset.gctOrigVisibility = editor.style.visibility;
+            editor.dataset.gctOrigOpacity = editor.style.opacity;
+            editor.dataset.gctOrigPointerEvents = editor.style.pointerEvents;
 
-            // Optional: Hide editor or ensure preview covers it.
-            // Preview is absolute positioned with z-index.
-            // If we need to interact with preview (e.g. select text), it must be on top.
+            // Hide the original editor to ensure it doesn't peek through or interfere
+            editor.style.visibility = 'hidden';
+            editor.style.opacity = '0';
+            editor.style.pointerEvents = 'none';
 
-            btn.innerText = 'Raw';
+            btn.innerText = 'Show Raw';
         } else {
             // Switch to RAW
             preview.style.display = 'none';
             copyBtn.style.display = 'none';
-            btn.innerText = 'Preview';
+            
+            // Restore the original editor styles from dataset using scoped names
+            editor.style.visibility = editor.dataset.gctOrigVisibility || '';
+            editor.style.opacity = editor.dataset.gctOrigOpacity || '';
+            editor.style.pointerEvents = editor.dataset.gctOrigPointerEvents || '';
+
+            // Clear saved values to avoid leaks
+            delete editor.dataset.gctOrigVisibility;
+            delete editor.dataset.gctOrigOpacity;
+            delete editor.dataset.gctOrigPointerEvents;
+            
+            btn.innerText = 'Show Preview';
         }
     }
 
@@ -151,12 +172,27 @@
         if (editor.tagName === 'TEXTAREA' || editor.tagName === 'INPUT') {
             return editor.value;
         } else {
-            // For contenteditable
+            // For contenteditable, try to get the rawest text possible.
+            // Some editors might have a hidden textarea or a specific way to get markdown.
+            // For now, if it's already markdown in the contenteditable, innerText is safer.
+            // Turndown is only if we are dealing with rich text that we want to convert.
+            
+            // HEURISTIC: If the text already looks like markdown (e.g. starts with # or has **),
+            // Turndown might over-process it.
+            const innerText = editor.innerText;
+            // Nitpick fix: Be stricter about markers, requiring following whitespace for block markers
+            // and also check for inline markers (**...**, __...__) anywhere in the text.
+            const looksLikeMarkdown = /^\s*(?:#+\s|>\s|[*+-]\s|\[.*\]\(.*\))/m.test(innerText) || 
+                                     /(\*\*|__).+?\1/.test(innerText);
+            
+            if (looksLikeMarkdown) {
+                return innerText;
+            }
+            
             if (turndownService) {
-                // Use Turndown to convert HTML to Markdown
                 return turndownService.turndown(editor.innerHTML);
             }
-            return editor.innerText;
+            return innerText;
         }
     }
 
