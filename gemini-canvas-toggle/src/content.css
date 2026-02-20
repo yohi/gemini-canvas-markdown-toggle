@@ -1,0 +1,64 @@
+/* Toggle Button */
+.gemini-canvas-toggle-btn {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 9999;
+  padding: 6px 12px;
+  background-color: #ffffff;
+  border: 1px solid #d0d7de;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif,"Apple Color Emoji","Segoe UI Emoji";
+  box-shadow: 0 1px 0 rgba(27,31,36,0.04);
+  color: #24292f;
+  transition: 0.2s cubic-bezier(0.3, 0, 0.5, 1);
+  transition-property: color, background-color, border-color;
+}
+
+.gemini-canvas-toggle-btn:hover {
+  background-color: #f3f4f6;
+  border-color: #1b1f2426;
+}
+
+/* Preview Container */
+.gemini-canvas-preview {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: white;
+  z-index: 9998; /* Below button but above content */
+  overflow-y: auto;
+  padding: 32px;
+  box-sizing: border-box;
+  display: none; /* Hidden by default */
+}
+
+/* Dark mode support */
+/* Assuming Gemini might have a dark theme attribute or class on body */
+body[data-theme="dark"] .gemini-canvas-preview,
+body.dark .gemini-canvas-preview {
+    background-color: #0d1117;
+    color: #c9d1d9;
+}
+
+body[data-theme="dark"] .gemini-canvas-toggle-btn,
+body.dark .gemini-canvas-toggle-btn {
+    background-color: #21262d;
+    color: #c9d1d9;
+    border-color: #30363d;
+}
+
+body[data-theme="dark"] .gemini-canvas-toggle-btn:hover,
+body.dark .gemini-canvas-toggle-btn:hover {
+    background-color: #30363d;
+    border-color: #8b949e;
+}
+
+/* Ensure the parent container has relative positioning so absolute children work */
+.gemini-canvas-container-relative {
+    position: relative !important;
+}

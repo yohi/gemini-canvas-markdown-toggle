@@ -1,0 +1,18 @@
+{
+  "manifest_version": 3,
+  "name": "Gemini Canvas Markdown Toggle",
+  "version": "1.0",
+  "description": "Toggle between Raw Markdown and Preview in Gemini Canvas.",
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://gemini.google.com/*"],
+      "css": ["libs/github-markdown.css", "src/content.css"],
+      "js": ["libs/marked.min.js", "libs/purify.min.js", "src/content.js"]
+    }
+  ]
+}
