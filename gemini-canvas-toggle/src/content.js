@@ -68,7 +68,9 @@
 
             editor.setAttribute('data-gemini-canvas-processed', 'true');
             container.classList.add(SELECTORS.processed);
-            container.style.position = 'relative';
+            if (window.getComputedStyle(container).position === 'static') {
+                container.style.position = 'relative';
+            }
 
             injectUI(container, editor);
         });
