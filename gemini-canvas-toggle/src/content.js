@@ -6,74 +6,70 @@
     console.log("Gemini Canvas Toggle: Loaded");
 
     const SELECTORS = {
-        // Heuristic: Look for contenteditable or textarea
         editor: 'textarea, [contenteditable="true"]',
-        // Class to mark processed containers
         processed: 'gemini-canvas-processed'
     };
 
+    const MIN_MARKDOWN_RATIO = 0.5; // Threshold for falling back to innerText if Turndown conversion fails significantly
+
     let turndownService;
+    let canvasObserver;
 
     function init() {
-        // Initialize TurndownService
         if (typeof TurndownService !== 'undefined') {
+            // Configure Turndown to be more faithful to GFM
             turndownService = new TurndownService({
                 headingStyle: 'atx',
-                codeBlockStyle: 'fenced'
+                codeBlockStyle: 'fenced',
+                bulletListMarker: '-',
+                strongDelimiter: '**',
+                emDelimiter: '*',
+                allowRawMarkdown: true
             });
+            
+            // Apply GFM plugin if available
             if (typeof turndownPluginGfm !== 'undefined' && turndownPluginGfm.gfm) {
                 turndownService.use(turndownPluginGfm.gfm);
             }
-        } else {
-            console.warn("Gemini Canvas Toggle: TurndownService not found. Markdown conversion might be limited.");
+
+            // STRATEGY: Do not escape markdown characters if opt-in flag is set. 
+            // We want the RAW characters as they are in the source.
+            const originalEscape = turndownService.escape;
+            turndownService.escape = function(string) {
+                if (this.options.allowRawMarkdown) return string;
+                return originalEscape.call(this, string);
+            };
         }
 
-        const observer = new MutationObserver((mutations) => {
-            detectCanvas();
-        });
-
-        observer.observe(document.body, {
-            childList: true,
-            subtree: true
-        });
-
-        // Initial check
+        canvasObserver = new MutationObserver(() => detectCanvas());
+        canvasObserver.observe(document.body, { childList: true, subtree: true });
         detectCanvas();
+
+        // Cleanup to prevent memory leaks
+        const cleanup = () => {
+            if (canvasObserver) {
+                canvasObserver.disconnect();
+                canvasObserver = null;
+            }
+        };
+        window.addEventListener('beforeunload', cleanup);
+        window.addEventListener('pagehide', cleanup);
     }
 
     function detectCanvas() {
-        // Find potential editor elements
         const editors = document.querySelectorAll(SELECTORS.editor);
-
         editors.forEach(editor => {
-            // Check if this specific editor is already processed
-            if (editor.hasAttribute('data-gemini-canvas-processed')) {
-                return;
-            }
-
+            if (editor.hasAttribute('data-gemini-canvas-processed')) return;
             const rect = editor.getBoundingClientRect();
-            // Heuristic: Canvas editor should be reasonably large
-            if (rect.width < 300 || rect.height < 150) {
-                return;
-            }
+            if (rect.width < 300 || rect.height < 150) return;
 
-            // Identify a suitable container to inject our UI
             let container = editor.parentElement;
-            
-            // CLEANUP: If there's already our UI in this container, remove it first.
-            // This handles cases where Gemini replaces the editor element.
-            const existingUI = container.querySelectorAll('.gemini-canvas-preview, .gemini-canvas-copy-btn, .gemini-canvas-toggle-btn');
-            if (existingUI.length > 0) {
-                existingUI.forEach(el => el.remove());
-            }
+            container.querySelectorAll('.gemini-canvas-preview, .gemini-canvas-copy-btn, .gemini-canvas-toggle-btn, .gemini-canvas-raw-source').forEach(el => el.remove());
 
-            // Mark as processed
             editor.setAttribute('data-gemini-canvas-processed', 'true');
-
-            // Ensure container has correct positioning
             container.classList.add(SELECTORS.processed);
-            if (getComputedStyle(container).position === 'static') {
-                container.classList.add('gemini-canvas-container-relative');
+            if (window.getComputedStyle(container).position === 'static') {
+                container.style.position = 'relative';
             }
 
             injectUI(container, editor);
@@ -81,143 +77,110 @@
     }
 
     function injectUI(container, editor) {
-        console.log("Gemini Canvas Toggle: Injecting UI", container);
-
-        // Create Preview Container
         const preview = document.createElement('div');
         preview.className = 'gemini-canvas-preview markdown-body';
+        preview.style.display = 'none';
         container.appendChild(preview);
 
-        // Create Copy Button (Hidden by default)
+        const rawSource = document.createElement('div');
+        rawSource.className = 'gemini-canvas-raw-source';
+        rawSource.style.display = 'none';
+        container.appendChild(rawSource);
+
         const copyBtn = document.createElement('button');
         copyBtn.className = 'gemini-canvas-copy-btn';
         copyBtn.innerText = 'Copy MD';
-        copyBtn.type = 'button';
         copyBtn.style.display = 'none';
         container.appendChild(copyBtn);
 
-        // Create Toggle Button
         const btn = document.createElement('button');
         btn.className = 'gemini-canvas-toggle-btn';
-        btn.innerText = 'Show Preview'; // Updated label
-        btn.type = 'button';
+        btn.innerText = 'Show RAW';
         container.appendChild(btn);
 
-        // Event Listener - Toggle
         btn.addEventListener('click', (e) => {
             e.stopPropagation();
-            e.preventDefault();
-            toggleMode(container, editor, preview, btn, copyBtn);
+            toggleMode(container, editor, preview, rawSource, btn, copyBtn);
         });
 
-        // Event Listener - Copy
         copyBtn.addEventListener('click', (e) => {
             e.stopPropagation();
-            e.preventDefault();
-            const text = getEditorText(editor);
+            const text = rawSource.textContent ?? getEditorText(container.querySelector(SELECTORS.editor) || editor);
             navigator.clipboard.writeText(text).then(() => {
-                const originalText = copyBtn.innerText;
+                const oldText = copyBtn.innerText;
                 copyBtn.innerText = 'Copied!';
-                setTimeout(() => {
-                    copyBtn.innerText = originalText;
-                }, 2000);
-            }).catch(err => {
-                console.error('Gemini Canvas Toggle: Failed to copy text: ', err);
+                setTimeout(() => copyBtn.innerText = oldText, 2000);
             });
         });
     }
 
-    function toggleMode(container, editor, preview, btn, copyBtn) {
-        const isPreviewHidden = (getComputedStyle(preview).display === 'none');
-
-        if (isPreviewHidden) {
-            // Switch to PREVIEW
-            const text = getEditorText(editor);
-            const html = renderMarkdown(text);
-            preview.innerHTML = html;
-            preview.style.display = 'block';
-            copyBtn.style.display = 'block';
-            
-            // Save current inline styles before hiding with scoped names
-            editor.dataset.gctOrigVisibility = editor.style.visibility;
-            editor.dataset.gctOrigOpacity = editor.style.opacity;
-            editor.dataset.gctOrigPointerEvents = editor.style.pointerEvents;
-
-            // Hide the original editor to ensure it doesn't peek through or interfere
-            editor.style.visibility = 'hidden';
-            editor.style.opacity = '0';
-            editor.style.pointerEvents = 'none';
-
-            btn.innerText = 'Show Raw';
-        } else {
-            // Switch to RAW
+    function toggleMode(container, editor, preview, rawSource, btn, copyBtn) {
+        const currentEditors = Array.from(container.querySelectorAll(SELECTORS.editor)).filter(el => !el.classList.contains('gemini-canvas-raw-source'));
+        const targetEditors = currentEditors.length > 0 ? currentEditors : [editor];
+        
+        const isPreviewVisible = (preview.style.display === 'block');
+        const isRawVisible = (rawSource.style.display === 'block');
+        
+        if (!isPreviewVisible && !isRawVisible) {
+            // EDITOR -> RAW
+            const text = getEditorText(targetEditors[0]);
+            rawSource.textContent = text; // Use textContent for raw strings
+            rawSource.style.display = 'block';
             preview.style.display = 'none';
-            copyBtn.style.display = 'none';
-            
-            // Restore the original editor styles from dataset using scoped names
-            editor.style.visibility = editor.dataset.gctOrigVisibility || '';
-            editor.style.opacity = editor.dataset.gctOrigOpacity || '';
-            editor.style.pointerEvents = editor.dataset.gctOrigPointerEvents || '';
-
-            // Clear saved values to avoid leaks
-            delete editor.dataset.gctOrigVisibility;
-            delete editor.dataset.gctOrigOpacity;
-            delete editor.dataset.gctOrigPointerEvents;
-            
+            copyBtn.style.display = 'block';
+            targetEditors.forEach(el => el.classList.add('gemini-canvas-editor-hidden'));
             btn.innerText = 'Show Preview';
+        } else if (isRawVisible) {
+            // RAW -> PREVIEW
+            const text = rawSource.textContent;
+            preview.innerHTML = renderMarkdown(text);
+            preview.style.display = 'block';
+            rawSource.style.display = 'none';
+            btn.innerText = 'Show Editor';
+        } else {
+            // PREVIEW -> EDITOR
+            preview.style.display = 'none';
+            rawSource.style.display = 'none';
+            copyBtn.style.display = 'none';
+            targetEditors.forEach(el => {
+                el.classList.remove('gemini-canvas-editor-hidden');
+                el.style.display = '';
+            });
+            btn.innerText = 'Show RAW';
         }
     }
 
     function getEditorText(editor) {
-        if (editor.tagName === 'TEXTAREA' || editor.tagName === 'INPUT') {
-            return editor.value;
-        } else {
-            // For contenteditable, try to get the rawest text possible.
-            // Some editors might have a hidden textarea or a specific way to get markdown.
-            // For now, if it's already markdown in the contenteditable, innerText is safer.
-            // Turndown is only if we are dealing with rich text that we want to convert.
+        if (editor.tagName === 'TEXTAREA' || editor.tagName === 'INPUT') return editor.value;
+        
+        if (turndownService) {
+            // STRATEGY: Gemini's ProseMirror often hides the actual markdown symbols.
+            // Turndown is much better at reconstructing them from the HTML structure.
             
-            // HEURISTIC: If the text already looks like markdown (e.g. starts with # or has **),
-            // Turndown might over-process it.
-            const innerText = editor.innerText;
-            // Nitpick fix: Be stricter about markers, requiring following whitespace for block markers
-            // and also check for inline markers (**...**, __...__) anywhere in the text.
-            const looksLikeMarkdown = /^\s*(?:#+\s|>\s|[*+-]\s|\[.*\]\(.*\))/m.test(innerText) || 
-                                     /(\*\*|__).+?\1/.test(innerText);
+            // Convert to Markdown
+            let markdown = turndownService.turndown(editor.innerHTML);
             
-            if (looksLikeMarkdown) {
-                return innerText;
+            // If the conversion result is too short but innerText is long, 
+            // something went wrong with Turndown, fallback to innerText.
+            const rawText = editor.innerText || "";
+            if (markdown.length < rawText.length * MIN_MARKDOWN_RATIO) {
+                return rawText;
             }
             
-            if (turndownService) {
-                return turndownService.turndown(editor.innerHTML);
-            }
-            return innerText;
+            return markdown;
         }
+        return editor.innerText || "";
     }
 
     function renderMarkdown(text) {
-        if (typeof marked === 'undefined' || typeof DOMPurify === 'undefined') {
-            console.error("Gemini Canvas Toggle: marked or DOMPurify not loaded");
-            return "Error: Libraries not loaded.";
-        }
-
+        if (typeof marked === 'undefined' || typeof DOMPurify === 'undefined') return "Error: Libraries not loaded.";
         try {
-            // marked.parse might be synchronous
-            const rawHtml = marked.parse(text);
-            const cleanHtml = DOMPurify.sanitize(rawHtml);
-            return cleanHtml;
+            return DOMPurify.sanitize(marked.parse(text));
         } catch (e) {
-            console.error("Gemini Canvas Toggle: Error rendering markdown", e);
             return "<p>Error rendering markdown.</p>";
         }
     }
 
-    // Start
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', init);
-    } else {
-        init();
-    }
-
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+    else init();
 })();
