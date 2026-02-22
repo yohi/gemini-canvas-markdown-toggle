@@ -10,7 +10,10 @@
         processed: 'gemini-canvas-processed'
     };
 
+    const MIN_MARKDOWN_RATIO = 0.5; // Threshold for falling back to innerText if Turndown conversion fails significantly
+
     let turndownService;
+    let canvasObserver;
 
     function init() {
         if (typeof TurndownService !== 'undefined') {
@@ -20,7 +23,8 @@
                 codeBlockStyle: 'fenced',
                 bulletListMarker: '-',
                 strongDelimiter: '**',
-                emDelimiter: '*'
+                emDelimiter: '*',
+                allowRawMarkdown: true
             });
             
             // Apply GFM plugin if available
@@ -28,16 +32,28 @@
                 turndownService.use(turndownPluginGfm.gfm);
             }
 
-            // STRATEGY: Do not escape markdown characters. 
+            // STRATEGY: Do not escape markdown characters if opt-in flag is set. 
             // We want the RAW characters as they are in the source.
+            const originalEscape = turndownService.escape;
             turndownService.escape = function(string) {
-                return string; 
+                if (this.options.allowRawMarkdown) return string;
+                return originalEscape.call(this, string);
             };
         }
 
-        const observer = new MutationObserver(() => detectCanvas());
-        observer.observe(document.body, { childList: true, subtree: true });
+        canvasObserver = new MutationObserver(() => detectCanvas());
+        canvasObserver.observe(document.body, { childList: true, subtree: true });
         detectCanvas();
+
+        // Cleanup to prevent memory leaks
+        const cleanup = () => {
+            if (canvasObserver) {
+                canvasObserver.disconnect();
+                canvasObserver = null;
+            }
+        };
+        window.addEventListener('beforeunload', cleanup);
+        window.addEventListener('pagehide', cleanup);
     }
 
     function detectCanvas() {
@@ -87,7 +103,7 @@
 
         copyBtn.addEventListener('click', (e) => {
             e.stopPropagation();
-            const text = rawSource.textContent || getEditorText(container.querySelector(SELECTORS.editor) || editor);
+            const text = rawSource.textContent ?? getEditorText(container.querySelector(SELECTORS.editor) || editor);
             navigator.clipboard.writeText(text).then(() => {
                 const oldText = copyBtn.innerText;
                 copyBtn.innerText = 'Copied!';
@@ -139,17 +155,13 @@
             // STRATEGY: Gemini's ProseMirror often hides the actual markdown symbols.
             // Turndown is much better at reconstructing them from the HTML structure.
             
-            // Optimization: Remove potential ProseMirror UI artifacts before converting
-            const tempDiv = document.createElement('div');
-            tempDiv.innerHTML = editor.innerHTML;
-            
             // Convert to Markdown
-            let markdown = turndownService.turndown(tempDiv.innerHTML);
+            let markdown = turndownService.turndown(editor.innerHTML);
             
             // If the conversion result is too short but innerText is long, 
             // something went wrong with Turndown, fallback to innerText.
             const rawText = editor.innerText || "";
-            if (markdown.length < rawText.length * 0.5) {
+            if (markdown.length < rawText.length * MIN_MARKDOWN_RATIO) {
                 return rawText;
             }
             
